@@ -91,7 +91,13 @@ dashboard** (see spec section 2) — don't rename these if you implement them:
 `alert_intake_to_delivery_seconds` (latency, the core SLI),
 `alert_intake_accepted_total` (traffic), `dispatch_delivery_outcome_total{outcome=...}`
 + `alert_intake_rejected_total` (errors), `queue_backlog_depth{queue=...}`
-(saturation).
+(saturation, visible messages only) + `queue_inflight_messages{queue=...}`
+(saturation, in-flight/received-but-not-yet-visible messages). The two queue
+gauges are deliberately kept separate rather than summed — they mean
+different things during a retry storm, where most of the backlog is
+in-flight, not visible. `queue_inflight_messages` isn't in the spec's
+original golden-signal table (section 2) — it was added later via code
+review; `queue_backlog_depth` is still the one the spec names.
 
 **Data model, API contract, frontend screens, seed-data requirements, and
 local-dev (`docker-compose.yml`) requirements** are all specified in detail

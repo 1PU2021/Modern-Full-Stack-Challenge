@@ -46,15 +46,16 @@ async function deleteMessage(client, queueUrl, receiptHandle) {
   return client.send(command);
 }
 
-async function getQueueDepth(client, queueUrl) {
+async function getQueueCounts(client, queueUrl) {
   const command = new GetQueueAttributesCommand({
     QueueUrl: queueUrl,
     AttributeNames: ['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible'],
   });
   const response = await client.send(command);
-  const visible = Number(response.Attributes?.ApproximateNumberOfMessages ?? 0);
-  const notVisible = Number(response.Attributes?.ApproximateNumberOfMessagesNotVisible ?? 0);
-  return visible + notVisible;
+  return {
+    visible: Number(response.Attributes?.ApproximateNumberOfMessages ?? 0),
+    inFlight: Number(response.Attributes?.ApproximateNumberOfMessagesNotVisible ?? 0),
+  };
 }
 
 module.exports = {
@@ -62,5 +63,5 @@ module.exports = {
   sendMessage,
   receiveMessages,
   deleteMessage,
-  getQueueDepth,
+  getQueueCounts,
 };

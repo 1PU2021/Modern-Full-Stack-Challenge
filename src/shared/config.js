@@ -7,7 +7,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  AWS_REGION: z.string().default('us-east-1'),
+  AWS_REGION: z.string().min(1, 'AWS_REGION is required'),
   SQS_ENDPOINT: z.string().optional(),
   ALERT_FANOUT_QUEUE_URL: z.string().min(1, 'ALERT_FANOUT_QUEUE_URL is required'),
   RECIPIENT_DISPATCH_QUEUE_URL: z.string().min(1, 'RECIPIENT_DISPATCH_QUEUE_URL is required'),

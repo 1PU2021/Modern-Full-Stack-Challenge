@@ -42,6 +42,13 @@ function createMetrics() {
     registers: [register],
   });
 
+  const queueInflightMessages = new client.Gauge({
+    name: 'queue_inflight_messages',
+    help: 'Approximate number of in-flight messages in a queue (received but not yet deleted or visible)',
+    labelNames: ['queue'],
+    registers: [register],
+  });
+
   return {
     register,
     intakeToDeliverySeconds,
@@ -49,6 +56,7 @@ function createMetrics() {
     intakeRejectedTotal,
     deliveryOutcomeTotal,
     queueBacklogDepth,
+    queueInflightMessages,
   };
 }
 

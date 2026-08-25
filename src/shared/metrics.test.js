@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createMetrics } = require('./metrics');
 
-test('createMetrics registers all four required metrics on an isolated registry', async () => {
+test('createMetrics registers all required metrics on an isolated registry', async () => {
   const metrics = createMetrics();
   const text = await metrics.register.metrics();
   assert.match(text, /alert_intake_to_delivery_seconds/);
@@ -12,6 +12,7 @@ test('createMetrics registers all four required metrics on an isolated registry'
   assert.match(text, /alert_intake_rejected_total/);
   assert.match(text, /dispatch_delivery_outcome_total/);
   assert.match(text, /queue_backlog_depth/);
+  assert.match(text, /queue_inflight_messages/);
 });
 
 test('intakeAcceptedTotal increments per tenant', async () => {
@@ -41,6 +42,17 @@ test('queueBacklogDepth is settable per queue', async () => {
   metrics.queueBacklogDepth.set({ queue: 'alert-fanout' }, 42);
   const value = await metrics.register.getSingleMetricAsString('queue_backlog_depth');
   assert.match(value, /queue="alert-fanout"\} 42/);
+});
+
+test('queueInflightMessages is settable per queue, independently of queueBacklogDepth', async () => {
+  const metrics = createMetrics();
+  metrics.queueBacklogDepth.set({ queue: 'alert-fanout' }, 5);
+  metrics.queueInflightMessages.set({ queue: 'alert-fanout' }, 12);
+
+  const backlogValue = await metrics.register.getSingleMetricAsString('queue_backlog_depth');
+  const inflightValue = await metrics.register.getSingleMetricAsString('queue_inflight_messages');
+  assert.match(backlogValue, /queue="alert-fanout"\} 5/);
+  assert.match(inflightValue, /queue="alert-fanout"\} 12/);
 });
 
 test('two createMetrics() calls do not share state', async () => {
