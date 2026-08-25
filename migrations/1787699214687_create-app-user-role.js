@@ -19,7 +19,19 @@ const TENANT_SCOPED_TABLES = [
  * @returns {Promise<void> | void}
  */
 exports.up = (pgm) => {
-  pgm.createRole('app_user', { login: true, password: 'app_user' });
+  // CREATE ROLE has no IF NOT EXISTS in Postgres, and roles are cluster-wide
+  // (not per-database) -- guard creation so a second contributor's database
+  // in the same local Postgres cluster doesn't fail migration with "role
+  // already exists".
+  pgm.sql(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
+        CREATE ROLE app_user WITH LOGIN PASSWORD 'app_user';
+      END IF;
+    END
+    $$;
+  `);
 
   pgm.grantOnSchemas({ schemas: 'public', roles: 'app_user', privileges: 'USAGE' });
 
@@ -49,5 +61,18 @@ exports.down = (pgm) => {
   });
   pgm.revokeOnTables({ tables: 'tenants', roles: 'app_user', privileges: ['SELECT'] });
   pgm.revokeOnSchemas({ schemas: 'public', roles: 'app_user', privileges: 'USAGE' });
-  pgm.dropRole('app_user');
+  // Guard the drop too, for the same reason. This does NOT fully solve the
+  // cross-database collision this role design has -- dropping app_user here
+  // still affects any other database in this cluster that also uses it --
+  // but it at least turns a hard failure into a safe no-op if the role was
+  // already removed by something else.
+  pgm.sql(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
+        DROP ROLE app_user;
+      END IF;
+    END
+    $$;
+  `);
 };

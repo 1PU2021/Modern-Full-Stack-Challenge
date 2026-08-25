@@ -74,7 +74,10 @@ their own passing test — see spec section 4 for the exact tests:
    `FORCE ROW LEVEL SECURITY` actually applies, and every request handler
    runs `SET LOCAL app.current_tenant = $1` inside a transaction before
    touching tenant-scoped tables. The DB-layer test is the one that matters
-   more — it must hold even when application code has a bug.
+   more — it must hold even when application code has a bug. Services must
+   build their pool from config.appDatabaseUrl, never config.databaseUrl
+   (the migration-owner connection) -- see src/shared/db.js's createPool
+   comment.
 
 **Provider stubs are load-bearing, not incidental.** They're what the rest
 of the challenge's burst/chaos testing grades against, so they must model

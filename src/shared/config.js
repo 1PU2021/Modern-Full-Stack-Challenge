@@ -7,6 +7,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  APP_DATABASE_URL: z.string().min(1, 'APP_DATABASE_URL is required'),
   AWS_REGION: z.string().min(1, 'AWS_REGION is required'),
   SQS_ENDPOINT: z.string().optional(),
   ALERT_FANOUT_QUEUE_URL: z.string().min(1, 'ALERT_FANOUT_QUEUE_URL is required'),
@@ -38,6 +39,7 @@ function loadConfig(env = process.env) {
     port: data.PORT,
     logLevel: data.LOG_LEVEL,
     databaseUrl: data.DATABASE_URL,
+    appDatabaseUrl: data.APP_DATABASE_URL,
     aws: {
       region: data.AWS_REGION,
       sqsEndpoint: data.SQS_ENDPOINT,

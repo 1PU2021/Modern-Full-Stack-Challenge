@@ -4,6 +4,10 @@ const { Pool } = require('pg');
 
 const TENANT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Callers choose which connection string to pass. Tenant-scoped services
+// must pass config.appDatabaseUrl (the app_user role) -- passing
+// config.databaseUrl (the migration-owner/superuser role) here silently
+// bypasses every RLS policy in this schema. See docs/APP_SPEC.md section 4.
 function createPool(databaseUrl) {
   return new Pool({ connectionString: databaseUrl });
 }

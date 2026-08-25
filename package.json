@@ -5,7 +5,7 @@
   "description": "Critical Notification Platform — intake, fanout, and dispatch of multi-channel alerts, scoped per-tenant.",
   "license": "MIT",
   "engines": {
-    "node": ">=20.6.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "intake": "node src/intake/index.js",

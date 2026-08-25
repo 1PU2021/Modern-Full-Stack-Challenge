@@ -65,3 +65,55 @@ test('as app_user, scoping the session to tenant B and querying WHERE tenant_id 
     });
   }
 });
+
+test('WITH CHECK rejects an app_user session scoped to tenant B from inserting a row claiming tenant A as its owner', async () => {
+  await ensureMigrated();
+
+  const tenantAId = randomUUID();
+  const tenantBId = randomUUID();
+
+  await withSuperuserClient(async (client) => {
+    await client.query(
+      `INSERT INTO tenants (id, slug, name, tenant_type) VALUES ($1, $2, 'Tenant A', 'county_em')`,
+      [tenantAId, `tenant-a-${tenantAId}`]
+    );
+    await client.query(
+      `INSERT INTO tenants (id, slug, name, tenant_type) VALUES ($1, $2, 'Tenant B', 'school_district')`,
+      [tenantBId, `tenant-b-${tenantBId}`]
+    );
+  });
+
+  try {
+    const config = loadConfig();
+    const appUserClient = new Client({ connectionString: appUserConnectionString(config.databaseUrl) });
+    await appUserClient.connect();
+    try {
+      await appUserClient.query('BEGIN');
+      // Scope this session to tenant B.
+      await appUserClient.query('SELECT set_config($1, $2, true)', [
+        'app.current_tenant',
+        tenantBId,
+      ]);
+      // Try to insert a row that CLAIMS tenant A as its tenant_id, while
+      // scoped as tenant B. WITH CHECK must reject this -- if it doesn't,
+      // a session scoped to one tenant could write data into another's.
+      await assert.rejects(
+        () =>
+          appUserClient.query(
+            `INSERT INTO users (tenant_id, email, password_hash) VALUES ($1, 'attacker@example.com', 'x')`,
+            [tenantAId]
+          ),
+        /row-level security/i
+      );
+      await appUserClient.query('ROLLBACK');
+    } finally {
+      await appUserClient.end();
+    }
+  } finally {
+    await withSuperuserClient(async (client) => {
+      // Nothing should have landed in `users` (the insert was rejected), so
+      // only the two tenant rows need cleanup.
+      await client.query('DELETE FROM tenants WHERE id IN ($1, $2)', [tenantAId, tenantBId]);
+    });
+  }
+});
