@@ -4,18 +4,24 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createDb } = require('./db');
 
-function fakeClient() {
+function fakeClient({ rollbackError } = {}) {
   const queries = [];
   let clientReleased = false;
+  let releaseArg;
   return {
     queries,
     isReleased: () => clientReleased,
+    releaseArg: () => releaseArg,
     query(text, params) {
       queries.push({ text, params });
+      if (text === 'ROLLBACK' && rollbackError) {
+        return Promise.reject(rollbackError);
+      }
       return Promise.resolve({ rows: [] });
     },
-    release() {
+    release(err) {
       clientReleased = true;
+      releaseArg = err;
     },
   };
 }
@@ -65,6 +71,23 @@ test('withTenant rolls back and releases the client when the callback throws', a
 
   assert.equal(client.queries.at(-1).text, 'ROLLBACK');
   assert.equal(client.isReleased(), true);
+});
+
+test('withTenant preserves the original error and destroys the client when ROLLBACK itself fails', async () => {
+  const rollbackError = new Error('connection terminated');
+  const client = fakeClient({ rollbackError });
+  const db = createDb(fakePool(client));
+
+  await assert.rejects(
+    () =>
+      db.withTenant('11111111-1111-1111-1111-111111111111', async () => {
+        throw new Error('boom');
+      }),
+    /boom/
+  );
+
+  assert.equal(client.isReleased(), true);
+  assert.equal(client.releaseArg(), rollbackError);
 });
 
 test('withTenant rejects a malformed tenant id before touching the database', async () => {

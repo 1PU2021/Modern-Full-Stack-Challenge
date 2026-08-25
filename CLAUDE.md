@@ -4,17 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repo
 
-This repo is at the pre-implementation stage: only `README.md`, `LICENSE`, and
-`docs/APP_SPEC.md` exist. There is no `package.json`, source code, or CI
-config yet. **`docs/APP_SPEC.md` is the authoritative spec** for everything
-that gets built here — read it in full before scaffolding or implementing
-anything, and treat any conflict between this file and the spec in the
-spec's favor (update this file if that happens).
-
-Because nothing is built yet, there are no real build/lint/test commands to
-document. Once `package.json` and the service directories exist, update this
-file with the actual commands (`npm run intake`, `npm test`, etc.) rather
-than guessing at them now.
+The repo is scaffolded but the services aren't implemented yet.
+`package.json` exists with npm scripts for all four service entrypoints
+(`intake`, `fanout`, `dispatch`, `stubs`) plus `migrate`, `seed`, `test`, and
+`lint` — but the four service entrypoints themselves
+(`src/intake/index.js`, `src/fanout/index.js`, `src/dispatch/index.js`,
+`src/stubs/index.js`) don't exist yet, so those four npm scripts aren't
+runnable yet. `src/shared/` has all five modules the spec calls for
+(`config.js`, `logger.js`, `metrics.js`, `queue.js`, `db.js`), each with its
+own passing `node:test` suite (24 tests total as of this writing). `npm
+test` and `npm run lint` are both real, working commands and both exit 0.
+**`docs/APP_SPEC.md` is the authoritative spec** for everything that gets
+built here — read it in full before implementing anything, and treat any
+conflict between this file and the spec in the spec's favor (update this
+file if that happens).
 
 ## What this repo is
 

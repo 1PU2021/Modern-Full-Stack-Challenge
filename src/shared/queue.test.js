@@ -64,10 +64,27 @@ test('getQueueDepth parses ApproximateNumberOfMessages as a number', async () =>
   const client = fakeClient(() => ({ Attributes: { ApproximateNumberOfMessages: '17' } }));
   const depth = await getQueueDepth(client, 'http://queue/alert-fanout');
   assert.equal(depth, 17);
+
+  const input = client.calls[0].input;
+  assert.deepEqual(input.AttributeNames, [
+    'ApproximateNumberOfMessages',
+    'ApproximateNumberOfMessagesNotVisible',
+  ]);
 });
 
 test('getQueueDepth defaults to zero when the attribute is missing', async () => {
   const client = fakeClient(() => ({ Attributes: {} }));
   const depth = await getQueueDepth(client, 'http://queue/alert-fanout');
   assert.equal(depth, 0);
+});
+
+test('getQueueDepth sums visible and in-flight messages so retry storms are not under-reported', async () => {
+  const client = fakeClient(() => ({
+    Attributes: {
+      ApproximateNumberOfMessages: '5',
+      ApproximateNumberOfMessagesNotVisible: '12',
+    },
+  }));
+  const depth = await getQueueDepth(client, 'http://queue/alert-fanout');
+  assert.equal(depth, 17);
 });

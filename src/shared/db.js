@@ -15,6 +15,7 @@ function createDb(pool) {
     }
 
     const client = await pool.connect();
+    let releaseErr;
     try {
       await client.query('BEGIN');
       await client.query('SELECT set_config($1, $2, true)', ['app.current_tenant', tenantId]);
@@ -22,10 +23,14 @@ function createDb(pool) {
       await client.query('COMMIT');
       return result;
     } catch (err) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        releaseErr = rollbackErr;
+      }
       throw err;
     } finally {
-      client.release();
+      client.release(releaseErr);
     }
   }
 

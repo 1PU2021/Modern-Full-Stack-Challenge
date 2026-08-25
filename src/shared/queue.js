@@ -49,10 +49,12 @@ async function deleteMessage(client, queueUrl, receiptHandle) {
 async function getQueueDepth(client, queueUrl) {
   const command = new GetQueueAttributesCommand({
     QueueUrl: queueUrl,
-    AttributeNames: ['ApproximateNumberOfMessages'],
+    AttributeNames: ['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible'],
   });
   const response = await client.send(command);
-  return Number(response.Attributes?.ApproximateNumberOfMessages ?? 0);
+  const visible = Number(response.Attributes?.ApproximateNumberOfMessages ?? 0);
+  const notVisible = Number(response.Attributes?.ApproximateNumberOfMessagesNotVisible ?? 0);
+  return visible + notVisible;
 }
 
 module.exports = {
