@@ -38,5 +38,12 @@ exports.up = (pgm) => {
  */
 exports.down = (pgm) => {
   pgm.dropTable('recipients');
-  pgm.dropExtension('postgis', { ifExists: true });
+  // Deliberately not dropping the postgis extension: up() creates it with
+  // ifNotExists: true because it may already be provided by the database
+  // environment (e.g. the postgis/postgis Docker image pre-installs it,
+  // along with postgis_topology and postgis_tiger_geocoder, which depend
+  // on it). This migration never assumed ownership of that extension, so
+  // down() must not attempt to remove it — doing so fails outright when
+  // those dependent extensions are present, and forcing it with CASCADE
+  // would destroy shared infrastructure this migration never created.
 };
