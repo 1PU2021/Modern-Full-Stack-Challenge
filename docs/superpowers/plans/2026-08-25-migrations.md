@@ -1407,6 +1407,10 @@ test('as app_user, scoping the session to tenant B and querying WHERE tenant_id 
     }
   } finally {
     await withSuperuserClient(async (client) => {
+      // users.tenant_id has no ON DELETE CASCADE (a deliberate schema
+      // choice, not an oversight) -- delete the dependent row before its
+      // parent tenant, or this delete fails on the FK constraint.
+      await client.query('DELETE FROM users WHERE tenant_id IN ($1, $2)', [tenantAId, tenantBId]);
       await client.query('DELETE FROM tenants WHERE id IN ($1, $2)', [tenantAId, tenantBId]);
     });
   }
@@ -1548,6 +1552,10 @@ test('GET /api/v1/alerts/:id returns 404, not 403, for an alert belonging to ano
 
   t.after(async () => {
     await withSuperuserClient(async (client) => {
+      // Delete children before parents -- alerts.created_by -> users and
+      // users.tenant_id -> tenants both lack ON DELETE CASCADE.
+      await client.query('DELETE FROM alerts WHERE tenant_id IN ($1, $2)', [tenantAId, tenantBId]);
+      await client.query('DELETE FROM users WHERE tenant_id IN ($1, $2)', [tenantAId, tenantBId]);
       await client.query('DELETE FROM tenants WHERE id IN ($1, $2)', [tenantAId, tenantBId]);
     });
   });
@@ -1593,6 +1601,10 @@ test('GET /api/v1/alerts/:id returns 200 when the alert belongs to the requestin
 
   t.after(async () => {
     await withSuperuserClient(async (client) => {
+      // Delete children before parents -- alerts.created_by -> users and
+      // users.tenant_id -> tenants both lack ON DELETE CASCADE.
+      await client.query('DELETE FROM alerts WHERE tenant_id = $1', [tenantId]);
+      await client.query('DELETE FROM users WHERE tenant_id = $1', [tenantId]);
       await client.query('DELETE FROM tenants WHERE id = $1', [tenantId]);
     });
   });
