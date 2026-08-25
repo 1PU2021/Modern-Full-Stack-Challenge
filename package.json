@@ -14,7 +14,8 @@
     "stubs": "node src/stubs/index.js",
     "migrate": "node-pg-migrate",
     "seed": "node scripts/seed.js",
-    "test": "node --test",
+    "test": "node --test 'src/**/*.test.js'",
+    "test:integration": "node --env-file=.env --test --test-concurrency=1 'test/integration/**/*.test.js'",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "eslint": "^9.9.1",
-    "node-pg-migrate": "^7.6.1"
+    "node-pg-migrate": "^7.6.1",
+    "supertest": "^7.0.0"
   }
 }
