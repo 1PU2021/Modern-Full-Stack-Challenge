@@ -250,7 +250,7 @@ idempotency_keys
 ### Row-level security (required, not optional)
 
 Every tenant-scoped table (`users`, `groups`, `recipients`, `group_members`,
-`alerts`, `deliveries`) gets:
+`alerts`, `deliveries`, `idempotency_keys`) gets:
 
 ```sql
 ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;

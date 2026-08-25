@@ -9,8 +9,13 @@ exports.up = (pgm) => {
   }, {
     constraints: { primaryKey: ['tenant_id', 'key'] },
   });
-  // Deliberately no RLS -- spec section 4's RLS table list names six tables
-  // and idempotency_keys is not one of them.
+
+  pgm.alterTable('idempotency_keys', { levelSecurity: 'ENABLE' });
+  pgm.alterTable('idempotency_keys', { levelSecurity: 'FORCE' });
+  pgm.createPolicy('idempotency_keys', 'tenant_isolation_idempotency_keys', {
+    using: "tenant_id = current_setting('app.current_tenant', true)::uuid",
+    check: "tenant_id = current_setting('app.current_tenant', true)::uuid",
+  });
 };
 
 exports.down = (pgm) => {

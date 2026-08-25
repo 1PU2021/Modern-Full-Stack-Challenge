@@ -55,18 +55,22 @@ test('deliveries table matches spec section 4, including RLS', async () => {
   });
 });
 
-test('idempotency_keys table matches spec section 4 and deliberately has NO row-level security', async () => {
+test('idempotency_keys table matches spec section 4, including RLS', async () => {
   await ensureMigrated();
   await withSuperuserClient(async (client) => {
     assert.ok(await schema.hasForeignKey(client, 'idempotency_keys', 'tenant_id', 'tenants'));
     assert.ok(await schema.hasForeignKey(client, 'idempotency_keys', 'alert_id', 'alerts'));
     assert.ok(await schema.hasPrimaryKey(client, 'idempotency_keys', ['tenant_id', 'key']));
 
-    // Spec section 4's RLS subsection names six tables; idempotency_keys is
-    // not one of them. Confirm that's really what's deployed, not an
-    // oversight this migration introduced.
+    // Spec section 4's RLS subsection was amended to add idempotency_keys to
+    // the six originally-named tables -- it's tenant-scoped data that
+    // participates directly in POST /alerts' idempotency lookup, and leaving
+    // it unprotected would let exactly the bug class RLS exists to catch (a
+    // query that forgets a tenant_id predicate) leak another tenant's
+    // alert_id back to the caller.
     const rls = await schema.rlsStatus(client, 'idempotency_keys');
-    assert.equal(rls.relrowsecurity, false);
-    assert.equal(rls.relforcerowsecurity, false);
+    assert.equal(rls.relrowsecurity, true);
+    assert.equal(rls.relforcerowsecurity, true);
+    assert.ok(await schema.hasPolicy(client, 'idempotency_keys', 'tenant_isolation_idempotency_keys'));
   });
 });
