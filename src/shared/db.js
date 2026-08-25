@@ -34,6 +34,10 @@ function createDb(pool) {
     }
   }
 
+  // `pool` is an escape hatch for non-tenant-scoped operations only (health
+  // checks, migrations-adjacent tooling). Tenant-scoped data access must go
+  // through withTenant() exclusively — querying `pool` directly bypasses the
+  // SET LOCAL app.current_tenant scoping that RLS depends on.
   return { pool, withTenant };
 }
 

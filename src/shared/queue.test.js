@@ -6,7 +6,7 @@ const {
   sendMessage,
   receiveMessages,
   deleteMessage,
-  getQueueDepth,
+  getQueueCounts,
 } = require('./queue');
 
 function fakeClient(responder) {
@@ -60,10 +60,15 @@ test('deleteMessage targets the queue and receipt handle', async () => {
   assert.equal(input.ReceiptHandle, 'receipt-123');
 });
 
-test('getQueueDepth parses ApproximateNumberOfMessages as a number', async () => {
-  const client = fakeClient(() => ({ Attributes: { ApproximateNumberOfMessages: '17' } }));
-  const depth = await getQueueDepth(client, 'http://queue/alert-fanout');
-  assert.equal(depth, 17);
+test('getQueueCounts parses visible and in-flight message counts as numbers', async () => {
+  const client = fakeClient(() => ({
+    Attributes: {
+      ApproximateNumberOfMessages: '17',
+      ApproximateNumberOfMessagesNotVisible: '3',
+    },
+  }));
+  const counts = await getQueueCounts(client, 'http://queue/alert-fanout');
+  assert.deepEqual(counts, { visible: 17, inFlight: 3 });
 
   const input = client.calls[0].input;
   assert.deepEqual(input.AttributeNames, [
@@ -72,19 +77,20 @@ test('getQueueDepth parses ApproximateNumberOfMessages as a number', async () =>
   ]);
 });
 
-test('getQueueDepth defaults to zero when the attribute is missing', async () => {
+test('getQueueCounts defaults both counts to zero when the attributes are missing', async () => {
   const client = fakeClient(() => ({ Attributes: {} }));
-  const depth = await getQueueDepth(client, 'http://queue/alert-fanout');
-  assert.equal(depth, 0);
+  const counts = await getQueueCounts(client, 'http://queue/alert-fanout');
+  assert.deepEqual(counts, { visible: 0, inFlight: 0 });
 });
 
-test('getQueueDepth sums visible and in-flight messages so retry storms are not under-reported', async () => {
+test('getQueueCounts keeps visible and in-flight counts separate rather than combining them', async () => {
   const client = fakeClient(() => ({
     Attributes: {
       ApproximateNumberOfMessages: '5',
       ApproximateNumberOfMessagesNotVisible: '12',
     },
   }));
-  const depth = await getQueueDepth(client, 'http://queue/alert-fanout');
-  assert.equal(depth, 17);
+  const counts = await getQueueCounts(client, 'http://queue/alert-fanout');
+  assert.equal(counts.visible, 5);
+  assert.equal(counts.inFlight, 12);
 });
