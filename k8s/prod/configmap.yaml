@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alerts-config
+  namespace: alerts-prod
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  AWS_REGION: "us-east-2"
+  SMS_PROVIDER_URL: http://provider-stubs:4000/sms/send
+  EMAIL_PROVIDER_URL: http://provider-stubs:4001/email/send
+
+  ALERT_FANOUT_QUEUE_URL: "https://sqs.us-east-2.amazonaws.com/942010118414/prod-alert-fanout"
+  RECIPIENT_DISPATCH_QUEUE_URL: "https://sqs.us-east-2.amazonaws.com/942010118414/prod-recipient-dispatch"
+
+  MAX_DELIVERY_ATTEMPTS: "5"
+
+  GEOCODER_PROVIDER: "none"
+  GEOCODER_USER_AGENT: ""

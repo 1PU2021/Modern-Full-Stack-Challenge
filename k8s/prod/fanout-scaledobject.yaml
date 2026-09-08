@@ -1,0 +1,21 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: fanout
+  namespace: alerts-prod
+
+spec:
+  scaleTargetRef:
+    name: fanout
+
+  minReplicaCount: 2
+  maxReplicaCount: 10
+
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: keda-aws-auth
+      metadata:
+        queueURL: https://sqs.us-east-2.amazonaws.com/942010118414/prod-alert-fanout
+        queueLength: "10"
+        awsRegion: us-east-2

@@ -1,0 +1,133 @@
+name: Deploy Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Microservice to deploy"
+        required: true
+        type: choice
+        options:
+          - intake
+          - fanout
+          - dispatch
+
+      image_tag:
+        description: "Approved image tag (CI commit SHA)"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  AWS_REGION: us-east-2
+  AWS_ACCOUNT_ID: "942010118414"
+
+jobs:
+  deploy:
+    name: Promote ${{ inputs.service }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::942010118414:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate approved image tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Image tag must be a full 40-character Git commit SHA."
+            exit 1
+          fi
+
+      - name: Verify image exists in ECR
+        env:
+          SERVICE: ${{ inputs.service }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          aws ecr describe-images \
+            --repository-name "alerts-$SERVICE" \
+            --image-ids "imageTag=$IMAGE_TAG"
+
+      - name: Update Helm image tag
+        env:
+          SERVICE: ${{ inputs.service }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          python3 - "$SERVICE" "$IMAGE_TAG" <<'PY'
+          import sys
+          from pathlib import Path
+
+          service = sys.argv[1]
+          image_tag = sys.argv[2]
+
+          path = Path("helm/alerts-platform/values.yaml")
+          lines = path.read_text().splitlines()
+
+          service_start = None
+          service_end = len(lines)
+
+          for i, line in enumerate(lines):
+              if line == f"{service}:":
+                  service_start = i
+                  break
+
+          if service_start is None:
+              raise SystemExit(f"Service block not found: {service}")
+
+          for i in range(service_start + 1, len(lines)):
+              line = lines[i]
+
+              if line and not line.startswith(" "):
+                  service_end = i
+                  break
+
+          tag_index = None
+          inside_image = False
+
+          for i in range(service_start + 1, service_end):
+              line = lines[i]
+
+              if line == "  image:":
+                  inside_image = True
+                  continue
+
+              if inside_image and line.startswith("  ") and not line.startswith("    "):
+                  inside_image = False
+
+              if inside_image and line.startswith("    tag:"):
+                  tag_index = i
+                  break
+
+          if tag_index is None:
+              raise SystemExit(f"Image tag not found inside {service} block")
+
+          lines[tag_index] = f'    tag: "{image_tag}"'
+          path.write_text("\n".join(lines) + "\n")
+          PY
+
+      - name: Show deployment change
+        run: git diff -- helm/alerts-platform/values.yaml
+
+      - name: Commit approved deployment
+        env:
+          SERVICE: ${{ inputs.service }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add helm/alerts-platform/values.yaml
+          git commit -m "Deploy ${SERVICE} ${IMAGE_TAG}"
+          git push origin HEAD:main

@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: migrate-test
+  namespace: alerts-prod
+spec:
+  restartPolicy: Never
+  containers:
+    - name: migrate
+      image: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-app:0.1.0
+      command: ["npm", "run", "migrate", "--", "up"]
+      env:
+        - name: DATABASE_URL
+          value: "REPLACE_ME"
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/rds-ca/global-bundle.pem
+      volumeMounts:
+        - name: rds-ca
+          mountPath: /etc/rds-ca
+          readOnly: true
+  volumes:
+    - name: rds-ca
+      configMap:
+        name: rds-ca-bundle

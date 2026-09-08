@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alerts-config
+  namespace: {{ .Values.global.namespace }}
+
+data:
+  NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  AWS_REGION: {{ .Values.config.awsRegion | quote }}
+
+  SMS_PROVIDER_URL: {{ .Values.config.smsProviderUrl | quote }}
+  EMAIL_PROVIDER_URL: {{ .Values.config.emailProviderUrl | quote }}
+
+  ALERT_FANOUT_QUEUE_URL: {{ .Values.config.alertFanoutQueueUrl | quote }}
+  RECIPIENT_DISPATCH_QUEUE_URL: {{ .Values.config.recipientDispatchQueueUrl | quote }}
+
+  MAX_DELIVERY_ATTEMPTS: {{ .Values.config.maxDeliveryAttempts | quote }}
+
+  GEOCODER_PROVIDER: {{ .Values.config.geocoderProvider | quote }}
+  GEOCODER_USER_AGENT: {{ .Values.config.geocoderUserAgent | quote }}

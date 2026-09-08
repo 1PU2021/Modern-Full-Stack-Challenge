@@ -1,0 +1,33 @@
+{
+    "GroupId": "sg-0107bbf590c74d4a8",
+    "GroupName": "k8s-alertspr-intake-2de596a408",
+    "Ingress": [
+        {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "UserIdGroupPairs": [],
+            "IpRanges": [
+                {
+                    "Description": "",
+                    "CidrIp": "0.0.0.0/0"
+                }
+            ],
+            "Ipv6Ranges": [],
+            "PrefixListIds": []
+        }
+    ],
+    "Egress": [
+        {
+            "IpProtocol": "-1",
+            "UserIdGroupPairs": [],
+            "IpRanges": [
+                {
+                    "CidrIp": "0.0.0.0/0"
+                }
+            ],
+            "Ipv6Ranges": [],
+            "PrefixListIds": []
+        }
+    ]
+}

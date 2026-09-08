@@ -1,0 +1,5 @@
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { describe, expect, it, vi } from 'vitest';
+import { AlertDetailView } from './AlertDetailView';
+describe('AlertDetailView', () => { it('shows canonical counts and delivery rows', async () => { const api = { getAlert: vi.fn().mockResolvedValue({ alert: { id: 'a', title: 'Storm', body: 'Now', priority: 'high', channels: ['sms'], status: 'completed' }, deliveryCounts: [{ status: 'delivered', count: 2 }] }), getDeliveries: vi.fn().mockResolvedValue([{ id: 'd', recipientName: 'Ada', channel: 'sms', status: 'delivered', attemptCount: 1 }]) }; render(<MemoryRouter initialEntries={['/alerts/a']}><Routes><Route path="/alerts/:id" element={<AlertDetailView api={api} />} /></Routes></MemoryRouter>); expect(await screen.findByText('Storm')).toBeInTheDocument(); expect(screen.getByText('Ada')).toBeInTheDocument(); expect(screen.getByText('2')).toBeInTheDocument(); }); });

@@ -1,0 +1,21 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: fanout
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  scaleTargetRef:
+    name: fanout
+
+  minReplicaCount: {{ .Values.fanout.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.fanout.autoscaling.maxReplicas }}
+
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: {{ .Values.fanout.autoscaling.authenticationRef }}
+      metadata:
+        queueURL: {{ .Values.fanout.autoscaling.queueURL }}
+        queueLength: {{ .Values.fanout.autoscaling.queueLength | quote }}
+        awsRegion: {{ .Values.fanout.autoscaling.awsRegion }}

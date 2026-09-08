@@ -1,0 +1,10 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-aws-auth
+  namespace: alerts-prod
+
+spec:
+  podIdentity:
+    provider: aws
+    identityOwner: keda

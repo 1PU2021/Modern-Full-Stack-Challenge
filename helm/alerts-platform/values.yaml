@@ -1,0 +1,204 @@
+global:
+  namespace: alerts-prod
+  awsRegion: us-east-2
+
+web:
+  replicas: 2
+
+  image:
+    repository: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-web
+    tag: "0.1.1"
+    pullPolicy: IfNotPresent
+
+  container:
+    port: 80
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+
+  apiUpstream: http://intake
+
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+intake:
+  replicas: 2
+
+  image:
+    repository: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-intake
+    tag: "d1ab07856c043b13f0190aab692076947a5bf863"
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    name: intake
+
+  container:
+    port: 3000
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+
+  ingress:
+    enabled: true
+    className: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/healthcheck-path: /readyz
+      alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+      alb.ingress.kubernetes.io/success-codes: "200"
+      alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
+
+  readinessProbe:
+    path: /readyz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  livenessProbe:
+    path: /healthz
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+fanout:
+  replicas: 2
+
+  image:
+    repository: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-fanout
+    tag: "d1ab07856c043b13f0190aab692076947a5bf863"
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    name: fanout
+
+  container:
+    port: 3001
+
+  readinessProbe:
+    path: /readyz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  livenessProbe:
+    path: /healthz
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 10
+    queueLength: "10"
+    queueURL: https://sqs.us-east-2.amazonaws.com/942010118414/prod-alert-fanout
+    awsRegion: us-east-2
+    authenticationRef: keda-aws-auth
+
+dispatch:
+  replicas: 2
+
+  image:
+    repository: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-dispatch
+    tag: "d1ab07856c043b13f0190aab692076947a5bf863"
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    name: dispatch
+
+  container:
+    port: 3002
+
+  readinessProbe:
+    path: /readyz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  livenessProbe:
+    path: /healthz
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+config:
+  nodeEnv: production
+  logLevel: info
+  awsRegion: us-east-2
+
+  smsProviderUrl: http://provider-stubs:4000/sms/send
+  emailProviderUrl: http://provider-stubs:4001/email/send
+
+  alertFanoutQueueUrl: https://sqs.us-east-2.amazonaws.com/942010118414/prod-alert-fanout
+  recipientDispatchQueueUrl: https://sqs.us-east-2.amazonaws.com/942010118414/prod-recipient-dispatch
+
+  maxDeliveryAttempts: "5"
+
+  geocoderProvider: none
+  geocoderUserAgent: ""
+
+externalSecrets:
+  refreshInterval: 1h
+  secretStoreName: aws-secrets-manager
+
+  appDbSecretName: prod/alerts/app-db
+  runtimeSecretName: prod/alerts/app-runtime
+
+providerStubs:
+  enabled: true
+  replicas: 1
+
+  image:
+    repository: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-app
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  smsPort: 4000
+  emailPort: 4001
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

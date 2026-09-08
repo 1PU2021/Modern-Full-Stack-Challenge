@@ -1,0 +1,74 @@
+{{- if .Values.providerStubs.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-stubs
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  replicas: {{ .Values.providerStubs.replicas }}
+
+  selector:
+    matchLabels:
+      app: provider-stubs
+
+  template:
+    metadata:
+      labels:
+        app: provider-stubs
+
+    spec:
+      containers:
+        - name: provider-stubs
+          image: "{{ .Values.providerStubs.image.repository }}:{{ .Values.providerStubs.image.tag }}"
+          imagePullPolicy: {{ .Values.providerStubs.image.pullPolicy }}
+
+          command:
+            - node
+            - -e
+            - |
+              const { startStubs } = require('./src/stubs');
+              const { createProviderPersonality } = require('./src/stubs/personality');
+
+              const smsPersonality = createProviderPersonality({
+                channel: 'sms',
+                failureRate: 0,
+                degradedFailureRate: 0,
+                degradationProbability: 0,
+                hangRate: 0
+              });
+
+              const emailPersonality = createProviderPersonality({
+                channel: 'email',
+                failureRate: 0,
+                degradedFailureRate: 0,
+                degradationProbability: 0,
+                hangRate: 0
+              });
+
+              startStubs({ smsPersonality, emailPersonality });
+
+          ports:
+            - name: sms
+              containerPort: {{ .Values.providerStubs.smsPort }}
+
+            - name: email
+              containerPort: {{ .Values.providerStubs.emailPort }}
+
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.providerStubs.smsPort }}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.providerStubs.smsPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 20
+
+          resources:
+{{ toYaml .Values.providerStubs.resources | indent 12 }}
+{{- end }}

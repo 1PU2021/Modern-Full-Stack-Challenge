@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fanout
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  replicas: {{ .Values.fanout.replicas }}
+
+  selector:
+    matchLabels:
+      app: fanout
+
+  template:
+    metadata:
+      labels:
+        app: fanout
+
+    spec:
+      serviceAccountName: {{ .Values.fanout.serviceAccount.name }}
+
+      containers:
+        - name: fanout
+          image: "{{ .Values.fanout.image.repository }}:{{ .Values.fanout.image.tag }}"
+          imagePullPolicy: {{ .Values.fanout.image.pullPolicy }}
+
+          command: ["npm", "run", "fanout"]
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.fanout.container.port }}
+
+          env:
+            - name: PORT
+              value: "{{ .Values.fanout.container.port }}"
+
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/rds-ca/global-bundle.pem
+
+          envFrom:
+            - configMapRef:
+                name: alerts-config
+
+            - secretRef:
+                name: alerts-runtime-secrets
+
+          volumeMounts:
+            - name: rds-ca
+              mountPath: /etc/rds-ca
+              readOnly: true
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.fanout.readinessProbe.path }}
+              port: {{ .Values.fanout.container.port }}
+            initialDelaySeconds: {{ .Values.fanout.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.fanout.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.fanout.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.fanout.readinessProbe.failureThreshold }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.fanout.livenessProbe.path }}
+              port: {{ .Values.fanout.container.port }}
+            initialDelaySeconds: {{ .Values.fanout.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.fanout.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.fanout.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.fanout.livenessProbe.failureThreshold }}
+
+          resources:
+{{ toYaml .Values.fanout.resources | indent 12 }}
+
+      volumes:
+        - name: rds-ca
+          configMap:
+            name: rds-ca-bundle

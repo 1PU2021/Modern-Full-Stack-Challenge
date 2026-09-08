@@ -1,7 +1,33 @@
+# --- Node app ---
+# installed npm dependencies, regenerated via `npm install`
 node_modules/
+# local environment variables/secrets, machine-specific
 .env
+# log output files
 *.log
+# generated test coverage reports
 coverage/
+# build output, regenerated on build
 dist/
+# frontend build output, regenerated on build
 web/dist/
+# frontend's own installed dependencies
 web/node_modules/
+
+# --- Terraform ---
+# current resource state; can contain sensitive values, never commit
+*.tfstate
+# backup/versioned state files, same reasoning as above
+*.tfstate.*
+# local provider/module plugin cache, regenerable via `terraform init`
+.terraform/
+# variable files; ignored by default since these often hold secrets
+*.tfvars
+# exception: non-secret sizing config, meant to be committed
+!infra/envs/prod/terraform.tfvars
+# exception: same, for the staging environment
+!infra/envs/staging/terraform.tfvars
+# private keys/certs, never belong in git
+*.pem
+# Kubernetes cluster credentials, never belong in git
+kubeconfig*

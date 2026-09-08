@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alerts-platform
+  namespace: argocd
+
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Final-Project-greenbean/Modern-Full-Stack-Challenge.git
+    targetRevision: main
+    path: helm/alerts-platform
+
+    helm:
+      releaseName: alerts-platform
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: alerts-prod
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=false

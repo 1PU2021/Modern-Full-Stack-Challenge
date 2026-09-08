@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intake
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  replicas: {{ .Values.intake.replicas }}
+
+  selector:
+    matchLabels:
+      app: intake
+
+  template:
+    metadata:
+      labels:
+        app: intake
+
+    spec:
+      serviceAccountName: {{ .Values.intake.serviceAccount.name }}
+
+      containers:
+        - name: intake
+          image: "{{ .Values.intake.image.repository }}:{{ .Values.intake.image.tag }}"
+          imagePullPolicy: {{ .Values.intake.image.pullPolicy }}
+
+          command: ["npm", "run", "intake"]
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.intake.container.port }}
+
+          env:
+            - name: PORT
+              value: "{{ .Values.intake.container.port }}"
+
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/rds-ca/global-bundle.pem
+
+          envFrom:
+            - configMapRef:
+                name: alerts-config
+
+            - secretRef:
+                name: alerts-runtime-secrets
+
+          volumeMounts:
+            - name: rds-ca
+              mountPath: /etc/rds-ca
+              readOnly: true
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.intake.readinessProbe.path }}
+              port: {{ .Values.intake.container.port }}
+            initialDelaySeconds: {{ .Values.intake.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.intake.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.intake.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.intake.readinessProbe.failureThreshold }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.intake.livenessProbe.path }}
+              port: {{ .Values.intake.container.port }}
+            initialDelaySeconds: {{ .Values.intake.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.intake.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.intake.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.intake.livenessProbe.failureThreshold }}
+
+          resources:
+{{ toYaml .Values.intake.resources | indent 12 }}
+
+      volumes:
+        - name: rds-ca
+          configMap:
+            name: rds-ca-bundle

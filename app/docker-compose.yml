@@ -1,0 +1,196 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notifications
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notifications"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.6.15
+    restart: unless-stopped
+    command: ["-Dconfig.file=/opt/elasticmq.conf"]
+    ports:
+      - "9324:9324"
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9324"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    command: ["npm", "run", "migrate", "up"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/notifications
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    build: .
+    command: ["npm", "run", "seed"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/notifications
+      APP_DATABASE_URL: postgres://app_user:app_user@postgres:5432/notifications
+      AWS_REGION: us-east-2
+      ALERT_FANOUT_QUEUE_URL: http://elasticmq:9324/queue/alert-fanout
+      RECIPIENT_DISPATCH_QUEUE_URL: http://elasticmq:9324/queue/recipient-dispatch
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-dev-platform-secret-change-me}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-only-change-me}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  stubs:
+    build: .
+    restart: unless-stopped
+    command: ["npm", "run", "stubs"]
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: info
+    ports:
+      - "4000:4000"
+      - "4001:4001"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  intake:
+    build: .
+    restart: unless-stopped
+    command: ["npm", "run", "intake"]
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/notifications
+      APP_DATABASE_URL: postgres://app_user:app_user@postgres:5432/notifications
+      AWS_REGION: us-east-2
+      SQS_ENDPOINT: http://elasticmq:9324
+      ALERT_FANOUT_QUEUE_URL: http://elasticmq:9324/queue/alert-fanout
+      RECIPIENT_DISPATCH_QUEUE_URL: http://elasticmq:9324/queue/recipient-dispatch
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-dev-platform-secret-change-me}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo-only-change-me}
+      GEOCODER_PROVIDER: ${GEOCODER_PROVIDER:-none}
+      GEOCODER_USER_AGENT: ${GEOCODER_USER_AGENT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticmq:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  fanout:
+    build: .
+    restart: unless-stopped
+    command: ["npm", "run", "fanout"]
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/notifications
+      APP_DATABASE_URL: postgres://app_user:app_user@postgres:5432/notifications
+      AWS_REGION: us-east-2
+      SQS_ENDPOINT: http://elasticmq:9324
+      ALERT_FANOUT_QUEUE_URL: http://elasticmq:9324/queue/alert-fanout
+      RECIPIENT_DISPATCH_QUEUE_URL: http://elasticmq:9324/queue/recipient-dispatch
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-dev-platform-secret-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticmq:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  dispatch:
+    build: .
+    restart: unless-stopped
+    command: ["npm", "run", "dispatch"]
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/notifications
+      APP_DATABASE_URL: postgres://app_user:app_user@postgres:5432/notifications
+      AWS_REGION: us-east-2
+      SQS_ENDPOINT: http://elasticmq:9324
+      ALERT_FANOUT_QUEUE_URL: http://elasticmq:9324/queue/alert-fanout
+      RECIPIENT_DISPATCH_QUEUE_URL: http://elasticmq:9324/queue/recipient-dispatch
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-dev-platform-secret-change-me}
+      SMS_PROVIDER_URL: http://stubs:4000/sms/send
+      EMAIL_PROVIDER_URL: http://stubs:4001/email/send
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticmq:
+        condition: service_healthy
+      stubs:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3002/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_PROXY_TARGET: http://intake:3000
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      intake:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

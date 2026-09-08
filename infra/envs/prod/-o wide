@@ -1,0 +1,30 @@
+[
+    {
+        "InstanceId": "i-0526180d45fa84eeb",
+        "PrivateIp": "10.0.68.13",
+        "SecurityGroups": [
+            {
+                "GroupId": "sg-0e8e5325e8bb6f052",
+                "GroupName": "eks-cluster-sg-prod-alerts-eks-258566003"
+            },
+            {
+                "GroupId": "sg-0279969db6be60690",
+                "GroupName": "prod-alerts-eks-node-sg"
+            }
+        ]
+    },
+    {
+        "InstanceId": "i-02712a572405c0a4b",
+        "PrivateIp": "10.0.90.169",
+        "SecurityGroups": [
+            {
+                "GroupId": "sg-0e8e5325e8bb6f052",
+                "GroupName": "eks-cluster-sg-prod-alerts-eks-258566003"
+            },
+            {
+                "GroupId": "sg-0279969db6be60690",
+                "GroupName": "prod-alerts-eks-node-sg"
+            }
+        ]
+    }
+]

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: intake
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  type: {{ .Values.intake.service.type }}
+
+  selector:
+    app: intake
+
+  ports:
+    - name: http
+      port: {{ .Values.intake.service.port }}
+      targetPort: {{ .Values.intake.service.targetPort }}
+      protocol: TCP

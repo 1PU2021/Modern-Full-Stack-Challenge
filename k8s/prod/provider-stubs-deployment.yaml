@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-stubs
+  namespace: alerts-prod
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: provider-stubs
+
+  template:
+    metadata:
+      labels:
+        app: provider-stubs
+
+    spec:
+      containers:
+        - name: provider-stubs
+          image: 942010118414.dkr.ecr.us-east-2.amazonaws.com/alerts-app:0.1.0
+
+          command:
+            - node
+            - -e
+            - |
+              const { startStubs } = require('./src/stubs');
+              const { createProviderPersonality } = require('./src/stubs/personality');
+
+              const smsPersonality = createProviderPersonality({
+                channel: 'sms',
+                failureRate: 0,
+                degradedFailureRate: 0,
+                degradationProbability: 0,
+                hangRate: 0
+              });
+
+              const emailPersonality = createProviderPersonality({
+                channel: 'email',
+                failureRate: 0,
+                degradedFailureRate: 0,
+                degradationProbability: 0,
+                hangRate: 0
+              });
+
+              startStubs({ smsPersonality, emailPersonality });
+
+          ports:
+            - name: sms
+              containerPort: 4000
+
+            - name: email
+              containerPort: 4001
+
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 4000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 4000
+            initialDelaySeconds: 5
+            periodSeconds: 20
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

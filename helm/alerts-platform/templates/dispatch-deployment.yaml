@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dispatch
+  namespace: {{ .Values.global.namespace }}
+
+spec:
+  replicas: {{ .Values.dispatch.replicas }}
+
+  selector:
+    matchLabels:
+      app: dispatch
+
+  template:
+    metadata:
+      labels:
+        app: dispatch
+
+    spec:
+      serviceAccountName: {{ .Values.dispatch.serviceAccount.name }}
+
+      containers:
+        - name: dispatch
+          image: "{{ .Values.dispatch.image.repository }}:{{ .Values.dispatch.image.tag }}"
+          imagePullPolicy: {{ .Values.dispatch.image.pullPolicy }}
+
+          command: ["npm", "run", "dispatch"]
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.dispatch.container.port }}
+
+          env:
+            - name: PORT
+              value: "{{ .Values.dispatch.container.port }}"
+
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/rds-ca/global-bundle.pem
+
+          envFrom:
+            - configMapRef:
+                name: alerts-config
+
+            - secretRef:
+                name: alerts-runtime-secrets
+
+          volumeMounts:
+            - name: rds-ca
+              mountPath: /etc/rds-ca
+              readOnly: true
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.dispatch.readinessProbe.path }}
+              port: {{ .Values.dispatch.container.port }}
+            initialDelaySeconds: {{ .Values.dispatch.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.dispatch.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.dispatch.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.dispatch.readinessProbe.failureThreshold }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.dispatch.livenessProbe.path }}
+              port: {{ .Values.dispatch.container.port }}
+            initialDelaySeconds: {{ .Values.dispatch.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.dispatch.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.dispatch.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.dispatch.livenessProbe.failureThreshold }}
+
+          resources:
+{{ toYaml .Values.dispatch.resources | indent 12 }}
+
+      volumes:
+        - name: rds-ca
+          configMap:
+            name: rds-ca-bundle

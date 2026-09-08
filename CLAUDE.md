@@ -4,17 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repo
 
-The repo is scaffolded but the services aren't implemented yet.
-`package.json` exists with npm scripts for all four service entrypoints
-(`intake`, `fanout`, `dispatch`, `stubs`) plus `migrate`, `seed`, `test`, and
-`lint` — but the four service entrypoints themselves
-(`src/intake/index.js`, `src/fanout/index.js`, `src/dispatch/index.js`,
-`src/stubs/index.js`) don't exist yet, so those four npm scripts aren't
-runnable yet. `src/shared/` has all five modules the spec calls for
-(`config.js`, `logger.js`, `metrics.js`, `queue.js`, `db.js`), each with its
-own passing `node:test` suite (24 tests total as of this writing). `npm
-test` and `npm run lint` are both real, working commands and both exit 0.
-**`docs/APP_SPEC.md` is the authoritative spec** for everything that gets
+The shared modules, database migrations/RLS, intake service, fanout worker,
+dispatch worker, and provider stubs are implemented. From `app/`, `npm run
+intake` starts the authenticated Express API and its durable outbox publisher;
+`npm run fanout` materializes deliveries; `npm run dispatch` consumes dispatch
+jobs and records provider outcomes; and `npm run stubs` starts deterministic
+SMS/email HTTP stubs. The API provides:
+
+- `POST /api/v1/alerts`
+- `GET /api/v1/alerts`
+- `GET /api/v1/alerts/:id`
+- `GET /api/v1/alerts/:id/deliveries`
+- `GET /api/v1/groups`
+- `GET /healthz`, `GET /readyz`, and `GET /metrics`
+
+The frontend/admin UI is implemented in `app/web`. Seeded demo login at
+`POST /api/auth/login`, dev-token tooling for curl/tests, the Docker image, and
+Compose environment are functional for local demos; they use explicitly
+non-production credentials and remain intentionally simple.
+From `app/`, the unit, integration, and lint commands are real and passing.
+**`app/docs/APP_SPEC.md` is the authoritative spec** for everything that gets
 built here — read it in full before implementing anything, and treat any
 conflict between this file and the spec in the spec's favor (update this
 file if that happens).
@@ -35,27 +44,32 @@ recipients in the background, and pushes a notification to each recipient
 over every requested channel (SMS, email), recording a per-recipient
 delivery outcome the operator watches fill in live.
 
-## Architecture (per the spec — to be scaffolded)
+## Architecture
 
-Single Node.js 20 / CommonJS / Express codebase, **one `package.json`, one
+Single Node.js 20 / CommonJS / Express codebase under `app/`, **one
+`app/package.json`, one
 Docker image, four container commands** selecting which service runs
 (`npm run intake`, `fanout`, `dispatch`, `stubs`) — this keeps one artifact
 SHA traceable to whatever's running in any role.
 
 ```
-src/
-├── shared/    # config, db (RLS-aware pool), queue, logger, metrics
-├── intake/    # Express API: POST/GET alerts, groups
-├── fanout/    # SQS consumer: resolves recipients, enqueues dispatch jobs
-├── dispatch/  # SQS consumer: calls providers, records delivery outcomes
-└── stubs/     # Express: fake SMS/email providers with realistic misbehavior
-web/           # Vite React app: compose, alert list, alert detail, login
-migrations/    # node-pg-migrate, one file per change, up+down
+app/src/
+├── shared/        # config, db (RLS-aware pool), queue, logger, metrics
+├── intake/        # Express API: POST/GET alerts, groups
+├── fanout/        # SQS consumer: resolves recipients, enqueues dispatch jobs
+├── dispatch/      # SQS consumer: calls providers, records delivery outcomes
+└── stubs/         # Express: fake SMS/email providers with realistic misbehavior
+app/web/           # Vite React app: compose, alert list, alert detail, groups
+app/migrations/    # node-pg-migrate, one file per change, up+down
 ```
 
-**Request flow:** `POST /alerts` only writes one row and enqueues one SQS
-message — recipient expansion never happens inline in the request handler,
-which is what keeps intake fast under burst. `fanout` resolves the target
+**Request flow:** `POST /alerts` atomically writes the alert, idempotency row,
+and one durable outbox event, then returns without waiting for SQS. The
+intake-owned publisher claims events in short tenant transactions, sends to
+SQS outside a transaction, and records success or retry state in another short
+transaction. Publication is at least once and preserves a stable event ID.
+Recipient expansion never happens inline in the request handler, which is what
+keeps intake fast under burst. The `fanout` worker resolves the target
 (group membership query, or a PostGIS `ST_Contains` polygon query) into
 recipient ids, writes one `pending` delivery row per recipient per channel,
 then enqueues one dispatch job per recipient per channel. `dispatch` calls
@@ -76,10 +90,10 @@ their own passing test — see spec section 4 for the exact tests:
    touching tenant-scoped tables. The DB-layer test is the one that matters
    more — it must hold even when application code has a bug. Services must
    build their pool from config.appDatabaseUrl, never config.databaseUrl
-   (the migration-owner connection) -- see src/shared/db.js's createPool
+   (the migration-owner connection) -- see app/src/shared/db.js's createPool
    comment.
 
-**Provider stubs are load-bearing, not incidental.** They're what the rest
+**The planned provider stubs are load-bearing, not incidental.** They're what the rest
 of the challenge's burst/chaos testing grades against, so they must model
 realistic misbehavior: baseline latency + failure rate, token-bucket rate
 limiting (`429` + `Retry-After`), and a correlated `degradeUntil` window that
@@ -103,8 +117,8 @@ original golden-signal table (section 2) — it was added later via code
 review; `queue_backlog_depth` is still the one the spec names.
 
 **Data model, API contract, frontend screens, seed-data requirements, and
-local-dev (`docker-compose.yml`) requirements** are all specified in detail
-in `docs/APP_SPEC.md` sections 4, 5, 8, 9, and 10 respectively — read the
+local-dev (`app/docker-compose.yml`) requirements** are all specified in detail
+in `app/docs/APP_SPEC.md` sections 4, 5, 8, 9, and 10 respectively — read the
 relevant section before touching that area rather than re-deriving it.
 
 ## Explicitly out of scope
@@ -115,11 +129,10 @@ voice channel, any direct cloud SDK calls beyond SQS (no direct S3/Secrets
 Manager from app code — secrets come in via env vars), multi-region/DR
 failover logic, a polished frontend design system.
 
-## Git workflow (per spec section 3)
+## Git workflow
 
-- `main` is protected — PRs only, at least one approving review, status
-  checks passing.
-- Short-lived feature branches: `feat/...`, `fix/...`, `chore/...`.
-- Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
-- Commits should be signed (GPG or SSH).
-- Keep PRs small — one logical change.
+Functionality is the current priority. Work within the repository's existing
+Git workflow, keep changes small and coherent, use Conventional Commits, and
+verify tests/lint at stopping points. Formal PR requirements, branch
+protection, approval gates, and production-grade repository governance remain
+deferred scope.

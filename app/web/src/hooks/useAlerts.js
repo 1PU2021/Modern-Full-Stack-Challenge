@@ -1,0 +1,2 @@
+import { useCallback, useEffect, useState } from 'react';
+export function useAlerts(api) { const [state, setState] = useState({ alerts: [], loading: true, error: null }); const refresh = useCallback(async () => { setState((s) => ({ ...s, loading: true, error: null })); try { setState({ alerts: await api.listAlerts(), loading: false, error: null }); } catch (error) { setState({ alerts: [], loading: false, error }); } }, [api]); useEffect(() => { void refresh(); }, [refresh]); return { ...state, refresh }; }
